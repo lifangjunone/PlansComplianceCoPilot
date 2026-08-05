@@ -4,6 +4,6 @@
   "version": "1.0.0",
   "description": "Monorepo root. Frontend (Vite/React) lives in ./frontend, backend (FastAPI) in ./backend. This root package.json exists so serverless build platforms that auto-detect package.json at the repository root can install/build the frontend.",
   "scripts": {
-    "build": "cd frontend && npm install && npm run build"
+    "build": "cd frontend && npm install --legacy-peer-deps --no-audit --no-fund && npm run build"
   }
 }

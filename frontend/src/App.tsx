@@ -10,8 +10,6 @@
  * imports); do not add business code here. The signed-in user is passed to
  * <Business /> through the `user` prop.
  */
-import { XAvatar } from '@tod-m/materials'
-import '@tod-m/materials/es/XAvatar/style/index.css'
 import { useEffect, useState } from 'react'
 
 import {
@@ -28,7 +26,7 @@ import Business from './business'
 function App() {
   const [user, setUser] = useState<UserResponse | null>(null)
   const [accessDeniedOwner, setAccessDeniedOwner] = useState<string | null>(null)
-  const [authToken, setAuthToken] = useState<string | null>(null)
+  const [, setAuthToken] = useState<string | null>(null)
   const [authReady, setAuthReady] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -242,13 +240,7 @@ function App() {
           <div className='access-denied' role='alert'>
             <span>抱歉您无权限访问该页面，请向</span>
             {hasAccessDeniedOwner ? (
-              <XAvatar.LarkUser
-                className='access-denied-owner'
-                user={accessDeniedOwner}
-                size='small'
-                gotoLarkWhenClick
-                customApiConfig={authToken ? { jwt: authToken } : undefined}
-              />
+              <span className='access-denied-owner'>{accessDeniedOwner}</span>
             ) : (
               <span>{accessDeniedOwner}</span>
             )}

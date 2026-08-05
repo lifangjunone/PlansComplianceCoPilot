@@ -1,5 +1,28 @@
-import { bytecloudAsyncJwtService } from '@bytecloud/common-lib'
-import type { BytecloudJwtPartition } from '@bytecloud/common-lib/es/jwt/jwt.type'
+// NOTE: This public demo build does NOT bundle the internal SSO library
+// (`@bytecloud/common-lib`), which is only available on the internal registry.
+// SSO is disabled for the public demo via `VITE_DISABLE_SSO=true`, so the code
+// paths below are never executed. We provide a local stub so the project still
+// type-checks and builds against the public npm registry. If you need real
+// internal SSO, restore `@bytecloud/common-lib` and build on an internal host.
+type BytecloudJwtPartition = string
+
+type JwtServiceLike = {
+  getJwt(): Promise<string>
+  clearCache(): void
+  redirectToLogin(): void
+  logout(): Promise<void>
+}
+
+const SSO_DISABLED_MESSAGE =
+  'Internal SSO is not available in this public demo build (VITE_DISABLE_SSO=true).'
+
+const bytecloudAsyncJwtService = {
+  async getServiceByPartition(
+    _partition: BytecloudJwtPartition,
+  ): Promise<JwtServiceLike> {
+    throw new Error(SSO_DISABLED_MESSAGE)
+  },
+}
 
 export const JWT_HEADER = 'x-jwt-token'
 export const CURRENT_USER_API_PATH = '/api/agents/v2/deployment/user'
