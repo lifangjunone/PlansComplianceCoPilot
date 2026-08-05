@@ -6,7 +6,7 @@ import aiofiles
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
 
 from parser_dxf import parse_dxf
@@ -50,6 +50,47 @@ def list_rules() -> Dict[str, Any]:
     return {"rules": RULES}
 
 
+TEST_DATA_META = {
+    ".dxf": {
+        "type": "DXF",
+        "kind": "2D CAD drawing (AutoCAD Drawing Exchange Format)",
+        "description": "Villa floor plan: plot boundary, building outline, room polygons and doors. Parsed by ezdxf to extract setbacks, room areas, corridor and door widths.",
+        "parsed_by": "ezdxf",
+        "mime": "application/dxf",
+    },
+    ".ifc": {
+        "type": "IFC",
+        "kind": "BIM model (Industry Foundation Classes)",
+        "description": "Building Information Model of the same villa (spaces, storeys, quantities). Parsed by IfcOpenShell to extract building height and space quantities.",
+        "parsed_by": "IfcOpenShell",
+        "mime": "application/x-step",
+    },
+    ".pdf": {
+        "type": "PDF",
+        "kind": "Submission document (vector PDF)",
+        "description": "Planning submission sheet. Text and vector lines are extracted by pdfplumber (used as supporting evidence; IFC/DXF are the geometric source of truth).",
+        "parsed_by": "pdfplumber",
+        "mime": "application/pdf",
+    },
+}
+
+
+def _test_data_entry(name: str) -> Dict[str, Any]:
+    full = os.path.join(TEST_DATA_DIR, name)
+    ext = os.path.splitext(name)[1].lower()
+    meta = TEST_DATA_META.get(ext, {})
+    return {
+        "name": name,
+        "size": os.path.getsize(full),
+        "type": meta.get("type", ext.lstrip(".").upper()),
+        "kind": meta.get("kind", ""),
+        "description": meta.get("description", ""),
+        "parsed_by": meta.get("parsed_by", ""),
+        "download_url": f"/api/test-data/{name}/download",
+        "preview_url": f"/api/test-data/{name}/preview",
+    }
+
+
 @app.get("/api/test-data")
 def list_test_data() -> Dict[str, Any]:
     if not os.path.isdir(TEST_DATA_DIR):
@@ -60,8 +101,129 @@ def list_test_data() -> Dict[str, Any]:
         if name.lower().endswith((".dxf", ".ifc", ".pdf")):
             full = os.path.join(TEST_DATA_DIR, name)
             if os.path.isfile(full):
-                files.append({"name": name, "size": os.path.getsize(full)})
+                files.append(_test_data_entry(name))
     return {"files": files}
+
+
+@app.get("/api/test-data/{name}/download")
+def download_test_data(name: str) -> FileResponse:
+    safe_name = os.path.basename(name)
+    full = os.path.join(TEST_DATA_DIR, safe_name)
+    if not os.path.isfile(full):
+        raise HTTPException(status_code=404, detail=f"Test file not found: {safe_name}")
+    ext = os.path.splitext(safe_name)[1].lower()
+    mime = TEST_DATA_META.get(ext, {}).get("mime", "application/octet-stream")
+    return FileResponse(full, media_type=mime, filename=safe_name)
+
+
+@app.get("/api/test-data/{name}/preview")
+def preview_test_data(name: str) -> Dict[str, Any]:
+    safe_name = os.path.basename(name)
+    full = os.path.join(TEST_DATA_DIR, safe_name)
+    if not os.path.isfile(full):
+        raise HTTPException(status_code=404, detail=f"Test file not found: {safe_name}")
+
+    ext = os.path.splitext(safe_name)[1].lower()
+    max_chars = 12000
+
+    if ext in (".dxf", ".ifc"):
+        with open(full, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read()
+        total_lines = content.count("\n") + 1
+        truncated = len(content) > max_chars
+        return {
+            "name": safe_name,
+            "format": "text",
+            "language": "dxf" if ext == ".dxf" else "ifc",
+            "total_lines": total_lines,
+            "truncated": truncated,
+            "content": content[:max_chars],
+        }
+
+    if ext == ".pdf":
+        parsed = parse_pdf(full)
+        pages = parsed.get("pages", [])
+        text = "\n\n".join(
+            f"--- Page {p.get('page_number')} ({p.get('line_count')} vector lines) ---\n{p.get('text', '')}"
+            for p in pages
+        )
+        truncated = len(text) > max_chars
+        return {
+            "name": safe_name,
+            "format": "text",
+            "language": "text",
+            "total_lines": text.count("\n") + 1,
+            "truncated": truncated,
+            "content": text[:max_chars] or "(No extractable text; this PDF is vector/graphics only.)",
+        }
+
+    raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
+
+
+@app.get("/api/architecture")
+def architecture() -> Dict[str, Any]:
+    """Feature -> open-source project mapping, used by the Docs view so the
+    team can show exactly which OSS project powers each capability."""
+    return {
+        "features": [
+            {
+                "feature": "IFC / BIM model parsing",
+                "capability": "Reads .ifc models; extracts storeys, spaces, quantities and building height.",
+                "oss": "IfcOpenShell",
+                "repo": "https://github.com/IfcOpenShell/IfcOpenShell",
+                "license": "LGPL-3.0",
+                "backend_file": "parser_ifc.py",
+            },
+            {
+                "feature": "DXF / 2D CAD parsing",
+                "capability": "Reads .dxf drawings; extracts plot boundary, building outline, room polygons, doors, setbacks and widths.",
+                "oss": "ezdxf",
+                "repo": "https://github.com/mozman/ezdxf",
+                "license": "MIT",
+                "backend_file": "parser_dxf.py",
+            },
+            {
+                "feature": "PDF submission extraction",
+                "capability": "Extracts text and vector line geometry from planning submission PDFs.",
+                "oss": "pdfplumber",
+                "repo": "https://github.com/jsvine/pdfplumber",
+                "license": "MIT",
+                "backend_file": "parser_pdf.py",
+            },
+            {
+                "feature": "Compliance rule engine",
+                "capability": "Deterministic checks of extracted quantities against ADG / SBC-201 rules with reasoning + corrective actions.",
+                "oss": "buildingSMART IDS (concept) + custom engine",
+                "repo": "https://github.com/buildingSMART/IDS",
+                "license": "MIT (IDS spec)",
+                "backend_file": "rule_engine.py",
+            },
+            {
+                "feature": "Floor-plan overlay (SVG)",
+                "capability": "Renders parsed geometry to SVG and highlights violating rooms / setbacks in red.",
+                "oss": "ezdxf geometry + custom SVG renderer",
+                "repo": "https://github.com/mozman/ezdxf",
+                "license": "MIT",
+                "backend_file": "main.py (_render_svg)",
+            },
+            {
+                "feature": "Backend API service",
+                "capability": "REST API: parse, check, run-full demo, geometry, test-data, docs.",
+                "oss": "FastAPI + Uvicorn",
+                "repo": "https://github.com/fastapi/fastapi",
+                "license": "MIT",
+                "backend_file": "main.py",
+            },
+            {
+                "feature": "Web frontend",
+                "capability": "Interactive review UI: run demo, upload, results table, overlay, docs and test data.",
+                "oss": "React + Vite + Radix UI",
+                "repo": "https://github.com/facebook/react",
+                "license": "MIT",
+                "backend_file": "frontend/src/business.tsx",
+            },
+        ]
+    }
 
 
 @app.post("/api/parse")

@@ -20,7 +20,10 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
+import ArchitectureView from './ArchitectureView'
+import TestDataView from './TestDataView'
 import type { UserResponse } from './lib/auth'
 
 type BusinessProps = {
@@ -157,6 +160,14 @@ function Business(_props: BusinessProps) {
         </div>
       </div>
 
+      <Tabs defaultValue='demo' className='w-full'>
+        <TabsList className='mb-6'>
+          <TabsTrigger value='demo'>▶ Live Demo</TabsTrigger>
+          <TabsTrigger value='docs'>📐 Architecture &amp; Open-Source</TabsTrigger>
+          <TabsTrigger value='data'>🗂 Test Data</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value='demo'>
       {error ? (
         <Card className='mb-6 border-red-200 bg-red-50'>
           <CardHeader>
@@ -454,6 +465,16 @@ function Business(_props: BusinessProps) {
           All parsing is performed by these real open-source libraries. No simulation or mockup.
         </div>
       </footer>
+        </TabsContent>
+
+        <TabsContent value='docs'>
+          <ArchitectureView />
+        </TabsContent>
+
+        <TabsContent value='data'>
+          <TestDataView />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
