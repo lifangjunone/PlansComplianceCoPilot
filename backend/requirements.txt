@@ -1,29 +1,16 @@
-# Deployment runtime compatibility (Python 3.8)
+# Python 3.11 / 3.12 deployment requirements
 #
-# IfcOpenShell (the real IFC engine) no longer ships Python 3.8 wheels on PyPI.
-# To keep this demo deployable while still using IfcOpenShell, we install it via
-# `install-ifcopenshell-python`, which downloads official IfcOpenShell binaries
-# at runtime.
+# IfcOpenShell now ships official wheels on PyPI for Python 3.11 / 3.12,
+# so we install it directly (no runtime binary download needed).
 
-uvicorn==0.22.0
-fastapi==0.67.0
-httpx==0.24.1
+# Web framework
+fastapi==0.115.6
+uvicorn==0.30.6
+httpx==0.27.2
+python-multipart==0.0.12
+aiofiles==24.1.0
 
 # Real parsing engines
-install-ifcopenshell-python==0.1.0
-
-# ezdxf version that supports Python 3.8
-# (newer ezdxf versions require Python >= 3.9/3.10)
-ezdxf==1.1.4
-
-# pdfplumber pinned to a Python 3.8 compatible dependency set
-pdfplumber==0.10.3
-pdfminer.six==20221105
-pypdfium2==4.30.0
-Pillow==10.4.0
-cryptography==47.0.0
-charset-normalizer==3.4.9
-
-# File upload support
-python-multipart==0.0.20
-aiofiles==24.1.0
+ifcopenshell==0.8.1.post1
+ezdxf==1.3.5
+pdfplumber==0.11.4
